@@ -21,5 +21,7 @@
 
     void CanvasScreen_Init();
     void CanvasScreen_Draw(uint16_t x, uint16_t y, uint8_t* data, uint16_t len);
+    void CanvasScreen_Present();
+    void CanvasScreen_Release();
 
 #endif

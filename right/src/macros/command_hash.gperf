@@ -100,6 +100,7 @@ ifRegLt, CommandId_ifRegLt
 mulReg, CommandId_mulReg
 noOp, CommandId_noOp
 notify, CommandId_notify
+oled, CommandId_oled
 oneShot, CommandId_oneShot
 overlayLayer, CommandId_overlayLayer
 overlayKeymap, CommandId_overlayKeymap

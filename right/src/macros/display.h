@@ -40,6 +40,8 @@
 
     macro_result_t Macros_ProcessSetLedTxtCommand(parser_context_t* ctx);
     macro_result_t Macros_ProcessNotifyCommand(parser_context_t* ctx);
+    macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx);
+    void Macros_ReleaseOled(uint8_t macroSlot);
 
 #endif
 

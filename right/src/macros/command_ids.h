@@ -118,6 +118,7 @@ typedef enum {
     CommandId_notify,
 
     // 'o' commands
+    CommandId_oled,
     CommandId_oneShot,
     CommandId_overlayLayer,
     CommandId_overlayKeymap,

@@ -9,6 +9,7 @@
 #include "macros/commands.h"
 #include "macros/debug_commands.h"
 #include "macros/core.h"
+#include "macros/display.h"
 #include "macros/scancode_commands.h"
 #include "macros/status_buffer.h"
 #include "macros/typedefs.h"
@@ -302,6 +303,7 @@ static macro_result_t endMacro(void)
     }
 
     freeLocalScopes();
+    Macros_ReleaseOled(S - MacroState);
 
     S->ms.macroSleeping = false;
     S->ms.macroPlaying = false;

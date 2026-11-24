@@ -1,6 +1,7 @@
 #include "canvas_screen.h"
 #include "keyboard/oled/oled_buffer.h"
 #include "keyboard/oled/oled.h"
+#include "keyboard/oled/oled_canvas.h"
 #include "keyboard/oled/widgets/widgets.h"
 #include "keyboard/oled/screens/screen_manager.h"
 #include <zephyr/sys/printk.h>
@@ -25,6 +26,30 @@ void CanvasScreen_Draw(uint16_t x, uint16_t y, uint8_t* data, uint16_t len) {
         x++;
     }
     Oled_RequestRedraw();
+}
+
+// Copies the macro canvas to the screen. The widget's position carries the anti-burn-in shift.
+void CanvasScreen_Present() {
+    ScreenManager_ActivateScreen(ScreenId_Canvas);
+    if (ActiveScreen != ScreenId_Canvas) {
+        return; // pairing has the screen
+    }
+    uint16_t offsetX = MIN(CanvasScreen->x, DISPLAY_WIDTH - OLED_CANVAS_WIDTH);
+    uint16_t offsetY = MIN(CanvasScreen->y, DISPLAY_HEIGHT - OLED_CANVAS_HEIGHT);
+    for (uint16_t y = 0; y < OLED_CANVAS_HEIGHT; y++) {
+        for (uint16_t x = 0; x < OLED_CANVAS_WIDTH; x++) {
+            Framebuffer_SetPixel(OledBuffer, offsetX + x, offsetY + y, OledCanvas_Get(x, y) << 4);
+        }
+        OledBuffer->dirtyRanges[offsetY + y].min = 0;
+        OledBuffer->dirtyRanges[offsetY + y].max = DISPLAY_WIDTH - 1;
+    }
+    Oled_RequestRedraw();
+}
+
+void CanvasScreen_Release() {
+    if (ActiveScreen == ScreenId_Canvas) {
+        ScreenManager_ActivateScreen(ScreenId_Main);
+    }
 }
 
 void CanvasScreen_Init() {

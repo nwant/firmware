@@ -2291,6 +2291,8 @@ static macro_result_t processCommand(parser_context_t* ctx)
             return Macros_ProcessNotifyCommand(ctx);
 
         // 'o' commands
+        case CommandId_oled:
+            return Macros_ProcessOledCommand(ctx);
         case CommandId_oneShot:
             return processOneShotCommand(ctx);
         case CommandId_overlayLayer:
