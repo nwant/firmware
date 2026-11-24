@@ -29,16 +29,20 @@ void CanvasScreen_Draw(uint16_t x, uint16_t y, uint8_t* data, uint16_t len) {
 }
 
 // Copies the macro canvas to the screen. The widget's position carries the anti-burn-in shift.
+// Both buffers hold two pixels per byte in the same order, so with an even horizontal offset
+// whole bytes can be copied.
 void CanvasScreen_Present() {
     ScreenManager_ActivateScreen(ScreenId_Canvas);
     if (ActiveScreen != ScreenId_Canvas) {
         return; // pairing has the screen
     }
-    uint16_t offsetX = MIN(CanvasScreen->x, DISPLAY_WIDTH - OLED_CANVAS_WIDTH);
+    uint16_t offsetX = MIN(CanvasScreen->x, DISPLAY_WIDTH - OLED_CANVAS_WIDTH) & ~1;
     uint16_t offsetY = MIN(CanvasScreen->y, DISPLAY_HEIGHT - OLED_CANVAS_HEIGHT);
     for (uint16_t y = 0; y < OLED_CANVAS_HEIGHT; y++) {
-        for (uint16_t x = 0; x < OLED_CANVAS_WIDTH; x++) {
-            Framebuffer_SetPixel(OledBuffer, offsetX + x, offsetY + y, OledCanvas_Get(x, y) << 4);
+        const uint8_t* from = OledCanvas_Row(y);
+        pixel_t* to = Framebuffer_GetPixel(OledBuffer, offsetX, offsetY + y);
+        for (uint16_t i = 0; i < OLED_CANVAS_WIDTH / 2; i++) {
+            to[i].value = from[i];
         }
         OledBuffer->dirtyRanges[offsetY + y].min = 0;
         OledBuffer->dirtyRanges[offsetY + y].max = DISPLAY_WIDTH - 1;

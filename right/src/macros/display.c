@@ -363,7 +363,7 @@ static void processOledText(parser_context_t* ctx, bool draw)
 
 macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
 {
-    enum { Pixel, Line, Rect, Fill, Circle, Disc } shape;
+    enum { Pixel, Line, Rect, Fill, Circle, Disc, Triangle } shape;
     uint8_t slot = S - MacroState;
 
     if (ConsumeToken(ctx, "begin")) {
@@ -407,12 +407,13 @@ macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
     else if (ConsumeToken(ctx, "fill")) { shape = Fill; count = 4; }
     else if (ConsumeToken(ctx, "circle")) { shape = Circle; count = 3; }
     else if (ConsumeToken(ctx, "disc")) { shape = Disc; count = 3; }
+    else if (ConsumeToken(ctx, "triangle")) { shape = Triangle; count = 6; }
     else {
         Macros_ReportErrorTok(ctx, "Unrecognized oled command:");
         return MacroResult_Finished;
     }
 
-    int32_t a[4] = { 0 };
+    int32_t a[6] = { 0 };
     for (uint8_t i = 0; i < count; i++) {
         a[i] = Macros_ConsumeInt(ctx);
     }
@@ -429,6 +430,7 @@ macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
         case Fill: OledCanvas_Fill(a[0], a[1], a[2], a[3], shade); break;
         case Circle: OledCanvas_Circle(a[0], a[1], a[2], shade); break;
         case Disc: OledCanvas_Disc(a[0], a[1], a[2], shade); break;
+        case Triangle: OledCanvas_Triangle(a[0], a[1], a[2], a[3], a[4], a[5], shade); break;
     }
 #else
     (void)shape; (void)a; (void)shade;

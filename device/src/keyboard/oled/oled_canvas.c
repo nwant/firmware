@@ -1,20 +1,41 @@
 #include "oled_canvas.h"
-#include <string.h>
 
 // Limits keep the loops short and the arithmetic inside 32 bits, whatever a macro asks for.
 #define MAX_COORDINATE 4000
 #define MAX_RADIUS 2000
 
-static uint8_t pixels[OLED_CANVAS_WIDTH * OLED_CANVAS_HEIGHT / 2];
+#define ROW_BYTES (OLED_CANVAS_WIDTH / 2)
+
+static uint8_t pixels[ROW_BYTES * OLED_CANVAS_HEIGHT] __attribute__((aligned(4)));
 
 static int32_t max32(int32_t a, int32_t b) { return a > b ? a : b; }
 static int32_t min32(int32_t a, int32_t b) { return a < b ? a : b; }
 static int32_t abs32(int32_t a) { return a < 0 ? -a : a; }
 static bool inRange(int32_t a) { return -MAX_COORDINATE <= a && a <= MAX_COORDINATE; }
 
+// Clearing the canvas with memset took about 1 ms on the keyboard, so this writes whole words.
+// They are volatile so that the compiler does not turn the loop back into memset.
+static void setBytes(uint8_t* at, uint32_t count, uint8_t value)
+{
+    for (; count > 0 && (uintptr_t)at % 4 != 0; count--) {
+        *at++ = value;
+    }
+    for (; count >= 4; count -= 4, at += 4) {
+        *(volatile uint32_t*)at = value * 0x01010101u;
+    }
+    for (; count > 0; count--) {
+        *(volatile uint8_t*)at++ = value;
+    }
+}
+
 void OledCanvas_Clear()
 {
-    memset(pixels, 0, sizeof(pixels));
+    setBytes(pixels, sizeof(pixels), 0);
+}
+
+const uint8_t* OledCanvas_Row(uint16_t y)
+{
+    return &pixels[y * ROW_BYTES];
 }
 
 uint8_t OledCanvas_Get(uint16_t x, uint16_t y)
@@ -36,8 +57,17 @@ static void span(int32_t x1, int32_t x2, int32_t y, uint8_t shade)
 {
     x1 = max32(x1, 0);
     x2 = min32(x2, OLED_CANVAS_WIDTH - 1);
-    for (int32_t x = x1; x <= x2; x++) {
-        OledCanvas_Pixel(x, y, shade);
+    if (x1 > x2 || y < 0 || y >= OLED_CANVAS_HEIGHT) {
+        return;
+    }
+    if (x1 % 2 == 1) {
+        OledCanvas_Pixel(x1++, y, shade);
+    }
+    if (x2 % 2 == 0) {
+        OledCanvas_Pixel(x2--, y, shade);
+    }
+    if (x1 < x2) {
+        setBytes(&pixels[y * ROW_BYTES + x1 / 2], (x2 - x1 + 1) / 2, shade << 4 | shade);
     }
 }
 
@@ -131,6 +161,46 @@ void OledCanvas_Disc(int32_t cx, int32_t cy, int32_t r, uint8_t shade)
     for (int32_t y = max32(-r, -cy); y <= min32(r, OLED_CANVAS_HEIGHT - 1 - cy); y++) {
         int32_t half = squareRoot(r * r + r - y * y);
         span(cx - half, cx + half, cy + y, shade);
+    }
+}
+
+// Where the edge crosses the row, rounded to the nearest pixel.
+static int32_t edgeX(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t y)
+{
+    int32_t den = 2 * (y2 - y1);
+    int32_t num = 2 * (y - y1) * (x2 - x1) + (y2 - y1);
+    return x1 + (num >= 0 ? num / den : -((den - 1 - num) / den));
+}
+
+void OledCanvas_Triangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, uint8_t shade)
+{
+    int32_t x[3] = { x1, x2, x3 }, y[3] = { y1, y2, y3 };
+    for (uint8_t i = 0; i < 3; i++) {
+        if (!inRange(x[i]) || !inRange(y[i])) {
+            return;
+        }
+    }
+    int32_t top = max32(0, min32(y1, min32(y2, y3)));
+    int32_t bottom = min32(OLED_CANVAS_HEIGHT - 1, max32(y1, max32(y2, y3)));
+    for (int32_t row = top; row <= bottom; row++) {
+        int32_t left = INT32_MAX, right = INT32_MIN;
+        for (uint8_t i = 0; i < 3; i++) {
+            uint8_t a = i, b = (i + 1) % 3;
+            if (y[a] > y[b]) {
+                uint8_t swap = a;
+                a = b;
+                b = swap;
+            }
+            if (row < y[a] || row > y[b]) {
+                continue;
+            }
+            bool flat = y[a] == y[b];
+            int32_t from = flat ? x[a] : edgeX(x[a], y[a], x[b], y[b], row);
+            int32_t to = flat ? x[b] : from;
+            left = min32(left, min32(from, to));
+            right = max32(right, max32(from, to));
+        }
+        span(left, right, row, shade);
     }
 }
 
