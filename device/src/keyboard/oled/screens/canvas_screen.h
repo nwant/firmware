@@ -10,6 +10,7 @@
 // Macros:
 
     #define CANVAS_TIMEOUT 60000
+    #define CANVAS_RELEASE_DELAY 100
 
 // Typedefs:
 

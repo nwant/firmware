@@ -4,6 +4,8 @@
 #include "keyboard/oled/oled_canvas.h"
 #include "keyboard/oled/widgets/widgets.h"
 #include "keyboard/oled/screens/screen_manager.h"
+#include "event_scheduler.h"
+#include "timer.h"
 #include <zephyr/sys/printk.h>
 
 widget_t* CanvasScreen;
@@ -50,9 +52,11 @@ void CanvasScreen_Present() {
     Oled_FramePresented();
 }
 
+// Keeps the last frame for a moment, so that the normal screen does not flash up when another
+// animation follows. Showing a frame moves this event out again.
 void CanvasScreen_Release() {
     if (ActiveScreen == ScreenId_Canvas) {
-        ScreenManager_ActivateScreen(ScreenId_Main);
+        EventScheduler_Reschedule(Timer_GetCurrentTime() + CANVAS_RELEASE_DELAY, EventSchedulerEvent_SwitchScreen, "CanvasScreen - release");
     }
 }
 
