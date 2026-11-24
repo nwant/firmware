@@ -53,6 +53,14 @@ void OledCanvas_Pixel(int32_t x, int32_t y, uint8_t shade)
     *pair = x % 2 ? (*pair & 0x0f) | (shade << 4) : (*pair & 0xf0) | shade;
 }
 
+// A shape may lie partly or fully outside, so its corner is limited before the sum.
+void OledCanvas_ShapePixel(int32_t x, int32_t y, int32_t column, int32_t row, uint8_t shade)
+{
+    if (inRange(x) && inRange(y) && inRange(row)) {
+        OledCanvas_Pixel(x + column, y + row, shade);
+    }
+}
+
 static void span(int32_t x1, int32_t x2, int32_t y, uint8_t shade)
 {
     x1 = max32(x1, 0);

@@ -287,6 +287,8 @@ macro_result_t Macros_ProcessNotifyCommand(parser_context_t* ctx)
 #define NO_OLED_OWNER 255
 #define OLED_TEXT_LENGTH 32
 #define OLED_SHOW_TIMEOUT 100
+#define OLED_ASLEEP_FRAME_TIME 250
+#define OLED_SHAPE_MAX_WIDTH 64
 
 static uint8_t oledOwner = NO_OLED_OWNER;
 
@@ -364,12 +366,78 @@ static void processOledText(parser_context_t* ctx, bool draw)
 #endif
 }
 
+static int8_t hexValue(char c)
+{
+    if ('0' <= c && c <= '9') {
+        return c - '0';
+    }
+    c |= 0x20;
+    return 'a' <= c && c <= 'f' ? c - 'a' + 10 : -1;
+}
+
+// Every hex digit holds four pixels, the leftmost one in the highest bit. A row takes as many
+// whole digits as its width needs, and the number of rows follows from the length.
+static void processOledShape(parser_context_t* ctx, bool draw)
+{
+    int32_t x = Macros_ConsumeInt(ctx);
+    int32_t y = Macros_ConsumeInt(ctx);
+    int32_t width = Macros_ConsumeInt(ctx);
+    uint8_t shade = consumeShade(ctx);
+
+    if (Macros_ParserError) {
+        return;
+    }
+    if (ctx->at == ctx->end || (*ctx->at != '"' && *ctx->at != '\'')) {
+        Macros_ReportErrorPos(ctx, "Oled shape needs its pixels as hex digits in quotes");
+        return;
+    }
+    if (!Macros_DryRun && (width < 1 || width > OLED_SHAPE_MAX_WIDTH)) {
+        Macros_ReportErrorNum("Oled shape width must be from 1 to 64, got:", width, ctx->at);
+        return;
+    }
+
+    const char* stringAt = ctx->at;
+    uint16_t stringOffset = 0, textIndex = 0, textSubIndex = 0;
+    int32_t column = 0, row = 0;
+    char c;
+    while ((c = Macros_ConsumeCharOfString(ctx, &stringOffset, &textIndex, &textSubIndex)) != '\0') {
+        int8_t bits = hexValue(c);
+        if (bits < 0) {
+            Macros_ReportError("Oled shape takes only hex digits", stringAt, stringAt);
+            return;
+        }
+        if (Macros_DryRun) {
+            continue; // the width may depend on variables
+        }
+#if DEVICE_HAS_OLED
+        for (uint8_t i = 0; draw && i < 4 && column + i < width; i++) {
+            if (bits & (8 >> i)) {
+                OledCanvas_ShapePixel(x, y, column + i, row, shade);
+            }
+        }
+#endif
+        column += 4;
+        if (column >= width) {
+            column = 0;
+            row++;
+        }
+    }
+    ConsumeWhite(ctx);
+    if (column != 0) {
+        Macros_ReportError("Oled shape has an incomplete last row", stringAt, stringAt);
+    }
+    (void)x; (void)y; (void)draw; (void)shade; (void)row;
+}
+
 #if DEVICE_HAS_OLED
 // Showing a frame while the previous one is still being sent makes the display start over from
-// the top row, so the lower rows would never be updated.
+// the top row, so the lower rows would never be updated. While the display sleeps, frames are
+// paced slowly, so that an endless animation does not keep the processor busy. The wait is
+// limited, because the display may stay off for good.
 static bool waitsForDisplay()
 {
-    if (!Oled_IsSendingFrame()) {
+    bool asleep = Oled_IsAsleep();
+    if (!asleep && !Oled_IsSendingFrame()) {
         S->as.actionActive = false;
         return false;
     }
@@ -377,7 +445,7 @@ static bool waitsForDisplay()
         S->as.actionActive = true;
         S->as.delayData.start = Timer_GetCurrentTime();
     }
-    if (Timer_GetElapsedTime(&S->as.delayData.start) >= OLED_SHOW_TIMEOUT) {
+    if (Timer_GetElapsedTime(&S->as.delayData.start) >= (asleep ? OLED_ASLEEP_FRAME_TIME : OLED_SHOW_TIMEOUT)) {
         S->as.actionActive = false;
         return false;
     }
@@ -409,7 +477,8 @@ macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
 #if DEVICE_HAS_OLED
         if (owns) {
             if (waitsForDisplay()) {
-                return Macros_SleepTillTime(Timer_GetCurrentTime() + 1, "Macros - oled show");
+                uint32_t pollTime = Oled_IsAsleep() ? 50 : 1;
+                return Macros_SleepTillTime(Timer_GetCurrentTime() + pollTime, "Macros - oled show");
             }
             CanvasScreen_Present();
         }
@@ -424,6 +493,11 @@ macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
     }
     if (ConsumeToken(ctx, "text")) {
         processOledText(ctx, owns);
+        return MacroResult_Finished;
+    }
+
+    if (ConsumeToken(ctx, "shape")) {
+        processOledShape(ctx, owns);
         return MacroResult_Finished;
     }
 

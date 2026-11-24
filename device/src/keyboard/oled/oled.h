@@ -19,6 +19,7 @@
     void Oled_RequestRedraw(void);
     void Oled_FramePresented(void);
     bool Oled_IsSendingFrame(void);
+    bool Oled_IsAsleep(void);
     void Oled_ShiftScreen();
     void Oled_UpdateBrightness();
     void Oled_ForceRender();

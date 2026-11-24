@@ -371,7 +371,11 @@ void Oled_FramePresented() {
 
 // A sleeping display sends nothing, so there is nothing to wait for.
 bool Oled_IsSendingFrame() {
-    return sentFrames != presentedFrames && computeBrightness() != 0;
+    return sentFrames != presentedFrames && !Oled_IsAsleep();
+}
+
+bool Oled_IsAsleep() {
+    return computeBrightness() == 0;
 }
 
 void InitOled(void) {
@@ -406,6 +410,7 @@ void Oled_ActivateScreen(widget_t* screen, bool forceRedraw){};
 void Oled_RequestRedraw(){};
 void Oled_FramePresented(){};
 bool Oled_IsSendingFrame(){ return false; };
+bool Oled_IsAsleep(){ return false; };
 void Oled_ShiftScreen(){};
 
 #endif // DEVICE_HAS_OLED

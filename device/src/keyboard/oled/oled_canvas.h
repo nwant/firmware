@@ -26,6 +26,7 @@
     void OledCanvas_Circle(int32_t cx, int32_t cy, int32_t r, uint8_t shade);
     void OledCanvas_Disc(int32_t cx, int32_t cy, int32_t r, uint8_t shade);
     void OledCanvas_Triangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, uint8_t shade);
+    void OledCanvas_ShapePixel(int32_t x, int32_t y, int32_t column, int32_t row, uint8_t shade);
     int32_t OledCanvas_TextWidth(const lv_font_t* font, const char* text);
     void OledCanvas_Text(int32_t x, int32_t y, const lv_font_t* font, uint8_t shade, const char* text);
 
