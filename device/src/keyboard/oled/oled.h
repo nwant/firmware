@@ -17,6 +17,8 @@
     void InitOled(void);
     void Oled_ActivateScreen(widget_t* screen, bool forceRedraw);
     void Oled_RequestRedraw(void);
+    void Oled_FramePresented(void);
+    bool Oled_IsSendingFrame(void);
     void Oled_ShiftScreen();
     void Oled_UpdateBrightness();
     void Oled_ForceRender();

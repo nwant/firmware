@@ -89,6 +89,10 @@ static bool oledNeedsRedraw = false;
 static bool lastOledNeedsRedraw = false;
 static k_tid_t oledThreadId = 0;
 
+// Frames handed over by macros, and the last one that reached the panel completely.
+static volatile uint32_t presentedFrames = 0;
+static volatile uint32_t sentFrames = 0;
+
 static widget_t* currentScreen = NULL;
 static uint16_t currentXShift = 0;
 static uint16_t currentYShift = 0;
@@ -232,7 +236,11 @@ static void adjustBrightness() {
     setOledBrightness(nextBrightness);
 }
 
+// The main thread can change the buffer while this runs. So each pixel is read once, and a
+// row's dirty range is taken before the row is scanned: later changes mark the row again.
 static void diffUpdate() {
+    uint32_t frame = presentedFrames;
+
     setA0(true);
     setOledCs(true);
 
@@ -242,10 +250,20 @@ static void diffUpdate() {
     uint8_t buf_pos = 0;
 
     for (uint16_t y = 0; y < DISPLAY_HEIGHT; y++) {
-        uint16_t min = roundToEven(OledBuffer->dirtyRanges[y].min);
-        uint16_t max = roundToEven(OledBuffer->dirtyRanges[y].max);
+        k_sched_lock();
+        range_t range = OledBuffer->dirtyRanges[y];
+        OledBuffer->dirtyRanges[y].min = 255;
+        OledBuffer->dirtyRanges[y].max = 0;
+        k_sched_unlock();
+
+        uint16_t min = roundToEven(range.min);
+        uint16_t max = roundToEven(range.max);
         for (uint16_t x = max; min <= x && x < DISPLAY_WIDTH; x -= 2) {
             if (oledNeedsRedraw) {
+                k_sched_lock();
+                OledBuffer->dirtyRanges[y].min = MIN(OledBuffer->dirtyRanges[y].min, range.min);
+                OledBuffer->dirtyRanges[y].max = MAX(OledBuffer->dirtyRanges[y].max, range.max);
+                k_sched_unlock();
                 setOledCs(false);
                 k_mutex_unlock(&SpiMutex);
                 return;
@@ -261,15 +279,17 @@ static void diffUpdate() {
 
                 setPositionTo(x, y, lastWrittenPixelX, lastWrittenPixelY);
 
-                buf[buf_pos++] = pixel->value;
-                pixel->oldValue = pixel->value;
+                uint8_t value = pixel->value;
+                buf[buf_pos++] = value;
+                pixel->oldValue = value;
 
                 uint16_t changed = 0;
 
                 while (shouldContinueWithoutPositionChange(x, y)) {
                     x -= 2;
-                    buf[buf_pos++] = PIXEL(x, y).value;
-                    PIXEL(x, y).oldValue = PIXEL(x, y).value;
+                    value = PIXEL(x, y).value;
+                    buf[buf_pos++] = value;
+                    PIXEL(x, y).oldValue = value;
                     changed++;
                 }
 
@@ -279,10 +299,9 @@ static void diffUpdate() {
                 lastWrittenPixelY = y;
             }
         }
-        OledBuffer->dirtyRanges[y].min = 255;
-        OledBuffer->dirtyRanges[y].max = 0;
     }
     setOledCs(false);
+    sentFrames = frame;
     // printk("update took %ims\n", k_uptime_get_32() - time);
 }
 
@@ -345,6 +364,16 @@ void Oled_RequestRedraw() {
     }
 }
 
+void Oled_FramePresented() {
+    presentedFrames++;
+    Oled_RequestRedraw();
+}
+
+// A sleeping display sends nothing, so there is nothing to wait for.
+bool Oled_IsSendingFrame() {
+    return sentFrames != presentedFrames && computeBrightness() != 0;
+}
+
 void InitOled(void) {
     gpio_pin_configure_dt(&oledEn, GPIO_OUTPUT);
     gpio_pin_set_dt(&oledEn, true);
@@ -375,6 +404,8 @@ void InitOled(void) {
 
 void Oled_ActivateScreen(widget_t* screen, bool forceRedraw){};
 void Oled_RequestRedraw(){};
+void Oled_FramePresented(){};
+bool Oled_IsSendingFrame(){ return false; };
 void Oled_ShiftScreen(){};
 
 #endif // DEVICE_HAS_OLED

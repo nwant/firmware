@@ -47,7 +47,7 @@ void CanvasScreen_Present() {
         OledBuffer->dirtyRanges[offsetY + y].min = 0;
         OledBuffer->dirtyRanges[offsetY + y].max = DISPLAY_WIDTH - 1;
     }
-    Oled_RequestRedraw();
+    Oled_FramePresented();
 }
 
 void CanvasScreen_Release() {

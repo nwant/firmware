@@ -17,7 +17,9 @@
 #endif
 
 #if DEVICE_HAS_OLED
+#include "keyboard/oled/oled.h"
 #include "keyboard/oled/screens/screen_manager.h"
+#include "timer.h"
 #include "keyboard/oled/screens/canvas_screen.h"
 #include "keyboard/oled/oled_canvas.h"
 #include "keyboard/oled/fonts/fonts.h"
@@ -284,6 +286,7 @@ macro_result_t Macros_ProcessNotifyCommand(parser_context_t* ctx)
 // PROTOTYPE: macro drawing commands. One macro owns the screen at a time.
 #define NO_OLED_OWNER 255
 #define OLED_TEXT_LENGTH 32
+#define OLED_SHOW_TIMEOUT 100
 
 static uint8_t oledOwner = NO_OLED_OWNER;
 
@@ -361,6 +364,27 @@ static void processOledText(parser_context_t* ctx, bool draw)
 #endif
 }
 
+#if DEVICE_HAS_OLED
+// Showing a frame while the previous one is still being sent makes the display start over from
+// the top row, so the lower rows would never be updated.
+static bool waitsForDisplay()
+{
+    if (!Oled_IsSendingFrame()) {
+        S->as.actionActive = false;
+        return false;
+    }
+    if (!S->as.actionActive) {
+        S->as.actionActive = true;
+        S->as.delayData.start = Timer_GetCurrentTime();
+    }
+    if (Timer_GetElapsedTime(&S->as.delayData.start) >= OLED_SHOW_TIMEOUT) {
+        S->as.actionActive = false;
+        return false;
+    }
+    return true;
+}
+#endif
+
 macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
 {
     enum { Pixel, Line, Rect, Fill, Circle, Disc, Triangle } shape;
@@ -384,6 +408,9 @@ macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
     if (ConsumeToken(ctx, "show")) {
 #if DEVICE_HAS_OLED
         if (owns) {
+            if (waitsForDisplay()) {
+                return Macros_SleepTillTime(Timer_GetCurrentTime() + 1, "Macros - oled show");
+            }
             CanvasScreen_Present();
         }
 #endif
