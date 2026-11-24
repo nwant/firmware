@@ -431,7 +431,7 @@ macro_result_t Macros_ProcessOledCommand(parser_context_t* ctx)
         case Disc: OledCanvas_Disc(a[0], a[1], a[2], shade); break;
     }
 #else
-    (void)shape; (void)shade;
+    (void)shape; (void)a; (void)shade;
 #endif
     return MacroResult_Finished;
 }
