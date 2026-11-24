@@ -388,12 +388,12 @@ COMMAND = powerMode [toggle] { shutdown | shutDown | autoShutdown }
   - `notify STRING` displays a notification with the given text on the OLED display. The notification will automatically disappear after the default timeout (3 seconds). Only works on devices with OLED displays (UHK 80).
 - `oled ...` (prototype) draws on the whole UHK 80 display. It draws nothing on the UHK 60.
   - The drawing area is 252 wide and 60 high, `0 0` is the top left, and anything outside is cut off. Shades go from 0 (black) to 15 (brightest). Drawing is invisible until `oled show`.
-  - `oled begin` starts a new black frame and takes over the display. If another macro is drawing, that macro ends. `oled show` shows the finished frame at once. `oled end` gives the display back to the normal indicators, which also happens when the macro ends.
+  - `oled begin` starts a new black frame and takes over the display. If another macro is drawing, that macro ends. `oled show` shows the finished frame. `oled end` gives the display back to the normal indicators, which also happens when the macro ends.
   - `rect` and `circle` are outlines, `fill`, `disc` and `triangle` are solid. Shade 0 erases.
   - `oled text` takes the top of the line as `y` and the line height in pixels as `size`: 8, 10, 12, 16, 24 or 32. The font has a fixed width: letters are about 5, 6, 7, 10, 14 and 19 pixels wide. Printable ASCII only.
   - Calculations need parentheses: `oled line 0 ($y + 2) 251 ($y + 2) 8`. Whole-number division drops the fraction.
   - Base movement on the time since the start (`$currentTime`), not on a frame counter, so speed does not depend on the keyboard's load.
-  - Run at most 19 commands without a pause, or key presses may be held back. `delayUntil`, `yield` and the end of each `while` pass are pauses. Put `delayUntil 33` or longer after each `oled show`.
+  - Run at most 19 commands without a pause, or key presses may be held back. `delayUntil`, `yield` and the end of each `while` pass are pauses. `oled show` waits until the previous frame is on the screen, so it sets the pace: no delay is needed after it.
   - To play on an event, name the macro `$onInit`, `$onLayerChange any`, `$onKeymapChange any` or `$onCapsLockStateChange`, and keep it under 1.5 seconds. At most 32 variables exist, shared by all macros, so reuse names.
 - `progressHue` or better `autoRepeat progressHue` will slowly adjust constantRGB value in order to rotate the per-key-RGB backlight through all hues.
 - `resetTrackpoint` resets the internal trackpoint board. Can be used to recover the trackpoint from drift conditions. Drifts usually happen if you keep the cursor moving at slow constant speeds, because of the boards's internal adaptive calibration. Since the board's parameters cannot be altered, the only way around is or you to learn not to do the type of movement which triggers them.
