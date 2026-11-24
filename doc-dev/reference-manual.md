@@ -115,6 +115,12 @@ COMMAND = resetTrackpoint
 COMMAND = printStatus
 COMMAND = setLedTxt <timeout, or 0 forever (INT)> [ DISPLAY_LOCATION STRING ]+ { STRING | VALUE }
 COMMAND = notify STRING
+COMMAND = oled { begin | show | end }
+COMMAND = oled pixel <x (INT)> <y (INT)> <shade, 0-15 (INT)>
+COMMAND = oled line <x1 (INT)> <y1 (INT)> <x2 (INT)> <y2 (INT)> <shade, 0-15 (INT)>
+COMMAND = oled {rect|fill} <x (INT)> <y (INT)> <width (INT)> <height (INT)> <shade, 0-15 (INT)>
+COMMAND = oled {circle|disc} <x (INT)> <y (INT)> <radius (INT)> <shade, 0-15 (INT)>
+COMMAND = oled text { <x (INT)> | center } <y (INT)> <size, 8|10|12|16|24|32 (INT)> <shade, 0-15 (INT)> { STRING | VALUE }
 COMMAND = write STRING
 COMMAND = goTo <index (ADDRESS)>
 COMMAND = repeatFor <var name (IDENTIFIER)> <action adr (ADDRESS)>
@@ -379,6 +385,15 @@ COMMAND = powerMode [toggle] { shutdown | shutDown | autoShutdown }
     - `setLedTxt 2000 abbrev "HLW" "Hello world!"` will display `HLW` on uhk60 and `Hello world!` on uhk80
     - `setLedTxt 2000 leftStatus "0" rightStatus "35 T"` will not display anything on uhk60 and change the leftStatus and rightStatus on uhk80
   - `notify STRING` displays a notification with the given text on the OLED display. The notification will automatically disappear after the default timeout (3 seconds). Only works on devices with OLED displays (UHK 80).
+- `oled ...` (prototype) draws on the whole UHK 80 display. It draws nothing on the UHK 60.
+  - The drawing area is 252 wide and 60 high, `0 0` is the top left, and anything outside is cut off. Shades go from 0 (black) to 15 (brightest). Drawing is invisible until `oled show`.
+  - `oled begin` starts a new black frame and takes over the display. If another macro is drawing, that macro ends. `oled show` shows the finished frame at once. `oled end` gives the display back to the normal indicators, which also happens when the macro ends.
+  - `rect` and `circle` are outlines, `fill` and `disc` are solid. Shade 0 erases.
+  - `oled text` takes the top of the line as `y` and the line height in pixels as `size`: 8, 10, 12, 16, 24 or 32. The font has a fixed width: letters are about 5, 6, 7, 10, 14 and 19 pixels wide. Printable ASCII only.
+  - Calculations need parentheses: `oled line 0 ($y + 2) 251 ($y + 2) 8`. Whole-number division drops the fraction.
+  - Base movement on the time since the start (`$currentTime`), not on a frame counter, so speed does not depend on the keyboard's load.
+  - Run at most 19 commands without a pause, or key presses may be held back. `delayUntil`, `yield` and the end of each `while` pass are pauses. Put `delayUntil 33` or longer after each `oled show`.
+  - To play on an event, name the macro `$onInit`, `$onLayerChange any`, `$onKeymapChange any` or `$onCapsLockStateChange`, and keep it under 1.5 seconds. At most 32 variables exist, shared by all macros, so reuse names.
 - `progressHue` or better `autoRepeat progressHue` will slowly adjust constantRGB value in order to rotate the per-key-RGB backlight through all hues.
 - `resetTrackpoint` resets the internal trackpoint board. Can be used to recover the trackpoint from drift conditions. Drifts usually happen if you keep the cursor moving at slow constant speeds, because of the boards's internal adaptive calibration. Since the board's parameters cannot be altered, the only way around is or you to learn not to do the type of movement which triggers them.
 - `i2cBaudRate <baud rate, default 100000(INT)>` sets i2c baud rate. Lowering this value may improve module reliability, while increasing latency.
